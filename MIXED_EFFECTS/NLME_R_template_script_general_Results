@@ -1,0 +1,513 @@
+3  1 0   10.996
+4  1 0   11.007
+5  1 0   11.161
+6  1 0   11.161
++ N_in <- max(Analyte.data['AT'])
++ ### plot raw data
++ plot(Analyte.data)
++ plotAnalyte <- ggplot(data=Analyte.data,aes(x=c,y=mobility)) + geom_point(color='#993399',size=1) + xlab("Concentration [µmol/l]") +ylab(expression('Effective Mobility ['*'10'^'-9'*'m'^2*'s'^'-1'*'V'^'-1'*']')) 
++ plotAnalyte_l <- plotAnalyte  + geom_line(color="#993399", aes(group=AT))
++ plotAnalyte_single <- plotAnalyte + geom_line() + facet_wrap(~AT)
++ ### preparation of the data
++ Theta.est <- data.frame()
++ fpred <- NULL
++ N <- N_in
++ for (i in (1:N)) {
++   pkmi <- nls(mobility ~ ms_ACE.model(Theta,c), 
++               start=list(Theta=c(uf=0, uc=-20, KD =100)), 
++               data=subset(Analyte.data, AT==i))
++   Theta.est <- rbind(Theta.est,coef(pkmi))
++   fpred <- c(fpred, predict(pkmi, newdata=new.df))
++ }
++ names(Theta.est) <- c("uf","uc","KD")
++ Theta.est
+        uf        uc       KD
+1 11.12060 -13.24728 257.3274
+2 11.08983 -20.14800 332.9449
+3 10.59133 -22.56737 349.3813
++ ### definition of variables
++ saemix.data <- saemixData(name.data       = Analyte.data,
++                           name.group      = "AT",
++                           name.predictors = "c",
++                           name.response   = "mobility",
++                           name.covariates=c("AT"))
+Using the object called Analyte.data in this R session as the data.
+[1] "AT"
+
+
+The following SaemixData object was successfully created:
+
+Object of class SaemixData
+    longitudinal data for use with the SAEM algorithm
+Dataset Analyte.data 
+    Structured data: mobility ~ c | AT 
+    Predictor: c () 
+    covariates: AT (-) 
++                           
++ ### Definition of mixed model parameter
++ ### transform: expected distribution of the parameter; 0: gaussian, 1: lognorm
++ saemix.model <- saemixModel(model = ms_ACE_total.model,
++                                 psi0  = c(uf=0,uc=-20,KD=100),
++                                 transform.par = c(0,0,1),
++                                 covariate.model = c(0,0,0),
++                                 covariance.model = matrix(c(1,1,1,1,1,1,1,1,1),nrow=3),
++                                 , error.model="constant")
+Warning: psi0 given as a vector, reshaping it to a matrix.
+
+
+The following SaemixModel object was successfully created:
+
+Nonlinear mixed-effects model
+  Model function
+function(Theta,AT,x){
+
+c  <- x[,1]
+uf <- Theta[AT,1]
+uc <- Theta[AT,2]
+KD <- Theta[AT,3]
+
+fpred <- uf + ((uc-uf)*c)/(KD + c)
+return(fpred)}
+  Nb of parameters: 3 
+      parameter names:  uf uc KD 
+      distribution:
+     Parameter Distribution Estimated
+[1,] uf        normal       Estimated
+[2,] uc        normal       Estimated
+[3,] KD        log-normal   Estimated
+  Variance-covariance matrix:
+   uf uc KD
+uf  1  1  1
+uc  1  1  1
+KD  1  1  1
+  Error model: constant , initial values: a.=1 
+    No covariate in the model.
+    Initial values
+             uf  uc  KD
+Pop.CondInit  0 -20 100
++ saemix.options <- list(map=TRUE, fim=TRUE, ll.is=FALSE, displayProgress=FALSE, seed=121589)
++ saemix.fit1    <- saemix(saemix.model, saemix.data, saemix.options)
+Nonlinear mixed-effects model fit by the SAEM algorithm
+-----------------------------------
+----          Data             ----
+-----------------------------------
+Object of class SaemixData
+    longitudinal data for use with the SAEM algorithm
+Dataset Analyte.data 
+    Structured data: mobility ~ c | AT 
+    Predictor: c () 
+    covariates: AT (-) 
+Dataset characteristics:
+    number of subjects:     3 
+    number of observations: 119 
+    average/min/max nb obs: 39.67  /  35  /  42 
+First 10 lines of data:
+   AT  c mobility AT.1 mdv cens occ ytype
+1   1  0  10.9400    1   0    0   1     1
+2   1  0  10.9320    1   0    0   1     1
+3   1  0  10.9960    1   0    0   1     1
+4   1  0  11.0070    1   0    0   1     1
+5   1  0  11.1610    1   0    0   1     1
+6   1  0  11.1610    1   0    0   1     1
+7   1 15   9.9218    1   0    0   1     1
+8   1 15   9.8980    1   0    0   1     1
+9   1 15   9.9675    1   0    0   1     1
+10  1 15   9.9250    1   0    0   1     1
+-----------------------------------
+----          Model            ----
+-----------------------------------
+Nonlinear mixed-effects model
+  Model function
+function(Theta,AT,x){
+
+c  <- x[,1]
+uf <- Theta[AT,1]
+uc <- Theta[AT,2]
+KD <- Theta[AT,3]
+
+fpred <- uf + ((uc-uf)*c)/(KD + c)
+return(fpred)}
+<bytecode: 0x564cb5b55d08>
+  Nb of parameters: 3 
+      parameter names:  uf uc KD 
+      distribution:
+     Parameter Distribution Estimated
+[1,] uf        normal       Estimated
+[2,] uc        normal       Estimated
+[3,] KD        log-normal   Estimated
+  Variance-covariance matrix:
+   uf uc KD
+uf  1  1  1
+uc  1  1  1
+KD  1  1  1
+  Error model: constant , initial values: a.=1 
+    No covariate in the model.
+    Initial values
+             uf  uc  KD
+Pop.CondInit  0 -20 100
+-----------------------------------
+----    Key algorithm options  ----
+-----------------------------------
+    Estimation of individual parameters (MAP)
+    Estimation of standard errors and linearised log-likelihood
+    Number of iterations:  K1=300, K2=100 
+    Number of chains:  17 
+    Seed:  121589 
+    Simulations:
+        nb of simulated datasets used for npde:  1000 
+        nb of simulated datasets used for VPC:  100 
+    Input/output
+        save the results to a file:  TRUE 
+        save the graphs to files:  TRUE 
+        directory where results should be saved:  newdir 
+----------------------------------------------------
+----                  Results                   ----
+----------------------------------------------------
+-----------------  Fixed effects  ------------------
+----------------------------------------------------
+     Parameter Estimate SE      CV(%)
+[1,] uf         10.9     0.1418  1.3 
+[2,] uc        -18.6     2.4461 13.2 
+[3,] KD        309.9    26.0204  8.4 
+[4,] a.          0.1     0.0069  6.7 
+----------------------------------------------------
+-----------  Variance of random effects  -----------
+----------------------------------------------------
+      Parameter Estimate SE     CV(%)
+uf    omega2.uf  0.059    0.049   83 
+uc    omega2.uc 14.697   14.615   99 
+KD    omega2.KD  0.015    0.017  115 
+covar cov.uf.uc  0.776    0.762   98 
+covar cov.uf.KD -0.024    0.025 -106 
+covar cov.uc.KD -0.468    0.499 -107 
+----------------------------------------------------
+------  Correlation matrix of random effects  ------
+----------------------------------------------------
+          omega2.uf omega2.uc omega2.KD
+omega2.uf  1.00      0.83     -0.8     
+omega2.uc  0.83      1.00     -1.0     
+omega2.KD -0.80     -1.00      1.0     
+----------------------------------------------------
+---------------  Statistical criteria  -------------
+----------------------------------------------------
+Likelihood computed by linearisation
+      -2LL= -179.6995 
+      AIC = -159.6995 
+      BIC = -168.7134 
+----------------------------------------------------
+Plotting the data
+Plotting convergence plots
+Plotting observations versus predictions
+Plotting individual fits
++ saemix.fit1@results
+Fixed effects
+ Parameter Estimate   SE      CV(%)
+ uf         10.936   0.14184  1.30 
+ uc        -18.581   2.44611 13.16 
+ KD        309.893  26.02038  8.40 
+ a.          0.103   0.00692  6.72 
+
+Variance of random effects
+ Parameter Estimate   SE     CV(%)
+ omega2.uf  0.0591   0.0493   83.4
+ omega2.uc 14.6966  14.6152   99.4
+ omega2.KD  0.0150   0.0173  114.8
+ cov.uf.uc  0.7761   0.7617   98.1
+ cov.uf.KD -0.0238   0.0253 -106.5
+ cov.uc.KD -0.4685   0.4992 -106.6
+
+Statistical criteria
+
+Correlation matrix of random effects
+          omega2.uf omega2.uc omega2.KD
+omega2.uf  1.000     0.833    -0.798   
+omega2.uc  0.833     1.000    -0.997   
+omega2.KD -0.798    -0.997     1.000   
+Likelihood computed by linearisation
+      -2LL= -179.6995 
+       AIC= -159.6995 
+       BIC= -168.7134 
++ psi <- psi(saemix.fit1)
++ psi
+        uf        uc       KD
+1 11.11749 -13.81373 265.3299
+2 11.09432 -18.80769 314.8665
+3 10.59475 -22.74519 351.5369
++ saemix.fit <- saemix.predict(saemix.fit1)
++ saemix.plot.fits(saemix.fit1)  
++ saemix.plot.obsvspred(saemix.fit1,level=1)
++ saemix.plot.scatterresiduals(saemix.fit1, level=1)
+> ### 
++ ### Dissertation_MOST Template for nonlinear mixed mode regression
++ ### Import all libraries
++ library(ggplot2)
++ library(saemix)
++ ### Definition of data file 
++ ### ms-ACE data of a specific substance
++ path <- file.path('~','Schreibtisch/PowerFolders/Dissertation_MOST/MU effective mobility/NLME/NLME R','S_AML_NLME_data.csv')
++ ### definition of the ms-ACE model
++ ms_ACE.model <- function(Theta,c){
++ uf <- Theta[1]
++ uc <- Theta[2]
++ KD <- Theta[3]
++ f <- uf + ((uc-uf)*c)/(KD + c)
++ return(f)}
++ ms_ACE_total.model <- function(Theta,AT,x){
++ c  <- x[,1]
++ uf <- Theta[AT,1]
++ uc <- Theta[AT,2]
++ KD <- Theta[AT,3]
++ fpred <- uf + ((uc-uf)*c)/(KD + c)
++ return(fpred)}
++ ### Import raw data and display the head
++ Analyte.data = read.csv(path)
++ head(Analyte.data)
+  AT c mobility
+1  1 0   10.948
+2  1 0   11.010
+3  1 0   11.041
+4  1 0   11.018
+5  1 0   11.172
+6  1 0   11.198
++ N_in <- max(Analyte.data['AT'])
++ ### plot raw data
++ plot(Analyte.data)
++ plotAnalyte <- ggplot(data=Analyte.data,aes(x=c,y=mobility)) + geom_point(color='#993399',size=1) + xlab("Concentration [µmol/l]") +ylab(expression('Effective Mobility ['*'10'^'-9'*'m'^2*'s'^'-1'*'V'^'-1'*']')) 
++ plotAnalyte_l <- plotAnalyte  + geom_line(color="#993399", aes(group=AT))
++ plotAnalyte_single <- plotAnalyte + geom_line() + facet_wrap(~AT)
++ ### preparation of the data
++ Theta.est <- data.frame()
++ fpred <- NULL
++ N <- N_in
++ for (i in (1:N)) {
++   pkmi <- nls(mobility ~ ms_ACE.model(Theta,c), 
++               start=list(Theta=c(uf=0, uc=-20, KD =100)), 
++               data=subset(Analyte.data, AT==i))
++   Theta.est <- rbind(Theta.est,coef(pkmi))
++   fpred <- c(fpred, predict(pkmi, newdata=new.df))
++ }
++ names(Theta.est) <- c("uf","uc","KD")
++ Theta.est
+         uf          uc        KD
+1 11.131593   -10.62795   76.5563
+2 10.976047   -17.93368  127.8192
+3  9.793195   -17.28531  145.3104
+4 11.111741   -15.24073  108.8316
+5 10.508462 -1120.46906 6293.2875
+6 11.140273   -11.18592   80.9943
++ ### definition of variables
++ saemix.data <- saemixData(name.data       = Analyte.data,
++                           name.group      = "AT",
++                           name.predictors = "c",
++                           name.response   = "mobility",
++                           name.covariates=c("AT"))
+Using the object called Analyte.data in this R session as the data.
+[1] "AT"
+
+
+The following SaemixData object was successfully created:
+
+Object of class SaemixData
+    longitudinal data for use with the SAEM algorithm
+Dataset Analyte.data 
+    Structured data: mobility ~ c | AT 
+    Predictor: c () 
+    covariates: AT (-) 
++                           
++ ### Definition of mixed model parameter
++ ### transform: expected distribution of the parameter; 0: gaussian, 1: lognorm
++ saemix.model <- saemixModel(model = ms_ACE_total.model,
++                                 psi0  = c(uf=0,uc=-20,KD=100),
++                                 transform.par = c(0,0,1),
++                                 covariate.model = c(0,0,0),
++                                 covariance.model = matrix(c(1,1,1,1,1,1,1,1,1),nrow=3),
++                                 , error.model="constant")
+Warning: psi0 given as a vector, reshaping it to a matrix.
+
+
+The following SaemixModel object was successfully created:
+
+Nonlinear mixed-effects model
+  Model function
+function(Theta,AT,x){
+
+c  <- x[,1]
+uf <- Theta[AT,1]
+uc <- Theta[AT,2]
+KD <- Theta[AT,3]
+
+fpred <- uf + ((uc-uf)*c)/(KD + c)
+return(fpred)}
+  Nb of parameters: 3 
+      parameter names:  uf uc KD 
+      distribution:
+     Parameter Distribution Estimated
+[1,] uf        normal       Estimated
+[2,] uc        normal       Estimated
+[3,] KD        log-normal   Estimated
+  Variance-covariance matrix:
+   uf uc KD
+uf  1  1  1
+uc  1  1  1
+KD  1  1  1
+  Error model: constant , initial values: a.=1 
+    No covariate in the model.
+    Initial values
+             uf  uc  KD
+Pop.CondInit  0 -20 100
++ saemix.options <- list(map=TRUE, fim=TRUE, ll.is=FALSE, displayProgress=FALSE, seed=121589)
++ saemix.fit1    <- saemix(saemix.model, saemix.data, saemix.options)
+Nonlinear mixed-effects model fit by the SAEM algorithm
+-----------------------------------
+----          Data             ----
+-----------------------------------
+Object of class SaemixData
+    longitudinal data for use with the SAEM algorithm
+Dataset Analyte.data 
+    Structured data: mobility ~ c | AT 
+    Predictor: c () 
+    covariates: AT (-) 
+Dataset characteristics:
+    number of subjects:     6 
+    number of observations: 168 
+    average/min/max nb obs: 28.00  /  24  /  30 
+First 10 lines of data:
+   AT  c mobility AT.1 mdv cens occ ytype
+1   1  0  10.9480    1   0    0   1     1
+2   1  0  11.0100    1   0    0   1     1
+3   1  0  11.0410    1   0    0   1     1
+4   1  0  11.0180    1   0    0   1     1
+5   1  0  11.1720    1   0    0   1     1
+6   1  0  11.1980    1   0    0   1     1
+7   1 15   7.6771    1   0    0   1     1
+8   1 15   7.7032    1   0    0   1     1
+9   1 15   7.7616    1   0    0   1     1
+10  1 15   7.7358    1   0    0   1     1
+-----------------------------------
+----          Model            ----
+-----------------------------------
+Nonlinear mixed-effects model
+  Model function
+function(Theta,AT,x){
+
+c  <- x[,1]
+uf <- Theta[AT,1]
+uc <- Theta[AT,2]
+KD <- Theta[AT,3]
+
+fpred <- uf + ((uc-uf)*c)/(KD + c)
+return(fpred)}
+<bytecode: 0x564cbbe6f580>
+  Nb of parameters: 3 
+      parameter names:  uf uc KD 
+      distribution:
+     Parameter Distribution Estimated
+[1,] uf        normal       Estimated
+[2,] uc        normal       Estimated
+[3,] KD        log-normal   Estimated
+  Variance-covariance matrix:
+   uf uc KD
+uf  1  1  1
+uc  1  1  1
+KD  1  1  1
+  Error model: constant , initial values: a.=1 
+    No covariate in the model.
+    Initial values
+             uf  uc  KD
+Pop.CondInit  0 -20 100
+-----------------------------------
+----    Key algorithm options  ----
+-----------------------------------
+    Estimation of individual parameters (MAP)
+    Estimation of standard errors and linearised log-likelihood
+    Number of iterations:  K1=300, K2=100 
+    Number of chains:  9 
+    Seed:  121589 
+    Simulations:
+        nb of simulated datasets used for npde:  1000 
+        nb of simulated datasets used for VPC:  100 
+    Input/output
+        save the results to a file:  TRUE 
+        save the graphs to files:  TRUE 
+        directory where results should be saved:  newdir 
+----------------------------------------------------
+----                  Results                   ----
+----------------------------------------------------
+-----------------  Fixed effects  ------------------
+----------------------------------------------------
+     Parameter Estimate SE     CV(%)
+[1,] uf         10.79    0.201  1.9 
+[2,] uc        -19.34    4.112 21.3 
+[3,] KD        124.49   19.531 15.7 
+[4,] a.          0.24    0.014  5.8 
+----------------------------------------------------
+-----------  Variance of random effects  -----------
+----------------------------------------------------
+      Parameter Estimate SE     CV(%)
+uf    omega2.uf  0.23     0.139  60  
+uc    omega2.uc 92.18    58.207  63  
+KD    omega2.KD  0.13     0.085  64  
+covar cov.uf.uc  1.52     2.125 140  
+covar cov.uf.KD -0.10     0.089 -85  
+covar cov.uc.KD -3.26     2.153 -66  
+----------------------------------------------------
+------  Correlation matrix of random effects  ------
+----------------------------------------------------
+          omega2.uf omega2.uc omega2.KD
+omega2.uf  1.00      0.33     -0.60    
+omega2.uc  0.33      1.00     -0.93    
+omega2.KD -0.60     -0.93      1.00    
+----------------------------------------------------
+---------------  Statistical criteria  -------------
+----------------------------------------------------
+Likelihood computed by linearisation
+      -2LL= 65.28414 
+      AIC = 85.28414 
+      BIC = 83.20174 
+----------------------------------------------------
+Plotting the data
+Plotting convergence plots
+Plotting observations versus predictions
+Plotting individual fits
++ saemix.fit1@results
+Fixed effects
+ Parameter Estimate   SE     CV(%)
+ uf         10.792   0.2006  1.86 
+ uc        -19.339   4.1119 21.26 
+ KD        124.488  19.5308 15.69 
+ a.          0.245   0.0141  5.76 
+
+Variance of random effects
+ Parameter Estimate   SE     CV(%)
+ omega2.uf  0.233    0.1395  60.0 
+ omega2.uc 92.176   58.2074  63.1 
+ omega2.KD  0.133    0.0853  64.0 
+ cov.uf.uc  1.518    2.1249 140.0 
+ cov.uf.KD -0.105    0.0893 -85.1 
+ cov.uc.KD -3.257    2.1526 -66.1 
+
+Statistical criteria
+
+Correlation matrix of random effects
+          omega2.uf omega2.uc omega2.KD
+omega2.uf  1.000     0.328    -0.596   
+omega2.uc  0.328     1.000    -0.929   
+omega2.KD -0.596    -0.929     1.000   
+Likelihood computed by linearisation
+      -2LL= 65.28414 
+       AIC= 85.28414 
+       BIC= 83.20174 
++ psi <- psi(saemix.fit1)
++ psi
+         uf        uc        KD
+1 11.108666 -11.47908  81.88069
+2 10.980910 -16.78866 120.42531
+3  9.820939 -17.77375 148.27665
+4 11.107068 -14.73779 105.73686
+5 10.675590 -40.27125 237.08349
+6 11.112174 -12.60694  89.08450
++ saemix.fit <- saemix.predict(saemix.fit1)
++ saemix.plot.fits(saemix.fit1)  
++ saemix.plot.obsvspred(saemix.fit1,level=1)
++ saemix.plot.scatterresiduals(saemix.fit1, level=1)
+> 
