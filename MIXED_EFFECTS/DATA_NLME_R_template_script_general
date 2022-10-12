@@ -1,0 +1,160 @@
+### 
+### Dissertation_MOST Template for nonlinear mixed mode regression
+
+### Import all libraries
+
+library(ggplot2)
+library(saemix)
+
+
+### Definition of data file 
+### ms-ACE data of a specific substance
+
+path <- file.path('~','Schreibtisch/PowerFolders/Dissertation_MOST/MU effective mobility/NLME/NLME R','L_TRP_NLME_data.csv')
+
+
+
+### definition of the ms-ACE model
+
+ms_ACE.model <- function(Theta,c){
+
+uf <- Theta[1]
+uc <- Theta[2]
+KD <- Theta[3]
+
+f <- uf + ((uc-uf)*c)/(KD + c)
+return(f)}
+
+
+ms_ACE_total.model <- function(Theta,AT,x){
+
+c  <- x[,1]
+uf <- Theta[AT,1]
+uc <- Theta[AT,2]
+KD <- Theta[AT,3]
+
+fpred <- uf + ((uc-uf)*c)/(KD + c)
+return(fpred)}
+
+### Import raw data and display the head
+
+Analyte.data = read.csv(path)
+head(Analyte.data)
+
+N_in <- max(Analyte.data['AT'])
+
+
+mob_min <- min(Analyte.data['mobility'])
+mob_max <- max(Analyte.data['mobility'])
+
+### plot raw data
+
+plot(Analyte.data)
+
+plotAnalyte <- ggplot(data=Analyte.data,aes(x=c,y=mobility)) + geom_point(color='#993399',size=1) + xlab("Concentration [µmol/l]") +ylab(expression('Effective Mobility ['*'10'^'-9'*'m'^2*'s'^'-1'*'V'^'-1'*']')) 
+
+plotAnalyte_l <- plotAnalyte  + geom_line(color="#993399", aes(group=AT))
+
+plotAnalyte_single <- plotAnalyte + geom_line() + facet_wrap(~AT)
+
+
+### preparation of the data
+
+
+Theta.est <- data.frame()
+fpred <- NULL
+N <- N_in
+for (i in (1:N)) {
+  pkmi <- nls(mobility ~ ms_ACE.model(Theta,c), 
+              start=list(Theta=c(uf=0, uc=-20, KD =100)), 
+              data=subset(Analyte.data, AT==i))
+  Theta.est <- rbind(Theta.est,coef(pkmi))
+  fpred <- c(fpred, predict(pkmi, newdata=new.df))
+}
+names(Theta.est) <- c("uf","uc","KD")
+Theta.est
+
+### definition of variables 
+
+
+saemix.data <- saemixData(name.data       = Analyte.data,
+                          name.group      = "AT",
+                          name.predictors = "c",
+                          name.response   = "mobility",
+                          name.covariates=c("AT"),
+                          units=list(x="µmol/l",y="10E-9 mE2 sE-1 VE-1"),
+                          name.X="Concentration")
+                          
+
+### Definition of mixed model parameter
+### transform: expected distribution of the parameter; 0: gaussian, 1: lognorm
+
+
+saemix.model <- saemixModel(model = ms_ACE_total.model,
+                                description="nonlinear Mixed Model Regression Analysis",
+                                psi0  = c(uf=mob_max,uc=mob_min,KD=100),
+                                transform.par = c(0,0,1),
+                                covariate.model = c(0,0,0),
+                                covariance.model = matrix(c(1,1,1,1,1,1,1,1,1),nrow=3),
+                                error.model="constant",
+                                name.response= 'Effective Mobility')
+
+saemix.options <- list(map=TRUE, fim=TRUE, ll.is=FALSE, displayProgress=FALSE, seed=121589)
+saemix.fit    <- saemix(saemix.model, saemix.data, saemix.options)
+
+saemix.fit@results
+
+psi <- psi(saemix.fit)
+psi
+
+
+plot(saemix.fit,plot.type="data",xlab='Concentration [µmol/l]',ylab='Effective Mobility [10E-9 mE2 sE-1 VE-1]', tit='fsf') 
+
+
+plot(saemix.fit,plot.type="individual.fit",ilist=c(1:N),smooth=TRUE,xlab='Concentration [µmol/l]',ylab='Effective Mobility [10E-9 mE2 sE-1 VE-1]')
+
+
+plot(saemix.fit,plot.type="random.effects")
+plot(saemix.fit,plot.type="npde")
+
+plot(saemix.fit,plot.type="parameters.vs.covariates")
+
+
+par(mfrow=c(1,1))
+plot(saemix.fit,plot.type="observations.vs.predictions",level=0,new=FALSE)
+
+plot(saemix.fit,plot.type="vpc",xlab='Concentration [µmol/l]',ylab='Effective Mobility [10E-9 mE2 sE-1 VE-1]',legend=TRUE)
+
+plot(saemix.fit,plot.type="marginal.distribution")
+
+plot(saemix.fit,plot.type="residuals.distribution")
+plot(saemix.fit,plot.type="residuals.scatter")
+
+
+
+plot(saemix.fit,plot.type="full")
+
+
+
+saemix.plot.select(
+saemix.fit ,
+data = TRUE,
+convergence = TRUE,
+likelihood = TRUE,
+individual.fit = TRUE,
+population.fit = TRUE,
+both.fit = TRUE,
+observations.vs.predictions = TRUE,
+residuals.scatter = TRUE,
+residuals.distribution = TRUE,
+random.effects = TRUE,
+correlations = TRUE,
+parameters.vs.covariates = TRUE,
+randeff.vs.covariates = TRUE,
+marginal.distribution = TRUE,
+vpc = TRUE,
+npde = TRUE
+)
+
+
+plot(saemix.fit,plot.type="vpc",title='sfsf')
